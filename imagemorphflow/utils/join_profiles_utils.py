@@ -1,12 +1,22 @@
+from contextlib import closing
 # utils/join_profiles_utils.py
 import os
 import sqlite3
 import pandas as pd
-import pycytominer
+try:
+    import pycytominer
+    from pycytominer.cyto_utils.cells import SingleCells
+except ImportError:
+    pycytominer = None
+    SingleCells = None
 from pathlib import Path
-from pycytominer.cyto_utils.cells import SingleCells
 
-COUNT_OBJECT_COL="Count_Cells" #change to Nuclei when only having Nuclei object (e.g., dormancy project)
+COUNT_OBJECT_COL = "Count_Cells"  # Override with join.count_object_column.
+
+def require_profiles():
+    if pycytominer is None:
+        raise ImportError("Profile processing requires: pip install 'imagemorphflow[profiles]'")
+
 
 def get_image_cols_from_db(
     database_path,
@@ -15,7 +25,7 @@ def get_image_cols_from_db(
 ):
     image_feature_categories = image_feature_categories or []
 
-    with sqlite3.connect(database_path) as conn:
+    with closing(sqlite3.connect(database_path)) as conn:
         image_table_cols = pd.read_sql("PRAGMA table_info(Image);", conn)["name"].tolist()
 
     base_cols = [
@@ -64,23 +74,22 @@ def clean_metadata_cols(df):
     seen = set()
     rename_map = {}
     to_drop = []
-    i = 0
 
     for col in df.columns:
         match = re.match(pattern, col)
         if match:
             base = match.group(1)
-            if i < 3:
+            if base not in seen:
+                seen.add(base)
                 rename_map[col] = f"Metadata_{base}"
             else:
                 to_drop.append(col)
-            i += 1
 
     df = df.rename(columns=rename_map).drop(columns=to_drop)
     return df
 
 def get_sql_table_names(database_path):
-    with sqlite3.connect(database_path) as conn:
+    with closing(sqlite3.connect(database_path)) as conn:
         tables = pd.read_sql(
             "SELECT name FROM sqlite_master WHERE type='table';",
             conn,
@@ -90,8 +99,8 @@ def get_sql_table_names(database_path):
 
 
 def read_table(database_path, table_name):
-    with sqlite3.connect(database_path) as conn:
-        df = pd.read_sql(f"SELECT * FROM {table_name};", conn)
+    with closing(sqlite3.connect(database_path)) as conn:
+        df = pd.read_sql('SELECT * FROM "' + table_name.replace('"', '""') + '";', conn)
 
     return df
 
@@ -180,6 +189,7 @@ def merge_extra_channel_tables(
                 df_extra[merge_keys + feature_cols],
                 on=merge_keys,
                 how="left",
+                validate="many_to_one",
             )
 
             print(f"Merged {extra_table}: {len(feature_cols)} extra columns")
@@ -271,67 +281,28 @@ def join_and_aggregate(
     write_parquet=False,
     count_obj_col=COUNT_OBJECT_COL,
     extra_channels=None,
+    options=None,
 ):
+    require_profiles()
+    options = options or {}
+    count_obj_col = options.get("count_object_column", count_obj_col)
     plate_db_path = os.path.join(project_path, "backend", plate, f"{plate}.db")
+    if not Path(plate_db_path).is_file():
+        raise FileNotFoundError(f"Plate database missing: {plate_db_path}")
     db_uri = f"sqlite:///{plate_db_path}"
     output_dir = os.path.join(project_path, "analysis", plate)
     profile_dir = os.path.join(project_path, "profiles", plate)
     os.makedirs(output_dir, exist_ok=True)
     os.makedirs(profile_dir, exist_ok=True)
 
-    # hardcoded for now; new projects won't need this
-    # see https://gitlab.gwdg.de/mpi-dortmund/comas/cellprofiler4-deepchem/-/issues/8#note_1366892
-    if project_name == "cl2025" or project_name == "a459":
+    if options.get("rename_metadata", False):
         rename_metadata_columns(plate_db_path)
-        image_feature_categories = [
-            "ImageQuality",
-            "Count",
-            "TableNumber",
-            "ImageNumber",
-        ]
-        strata_agg = ["Metadata_Plate", "Metadata_Well", "Metadata_Site"]
-    elif "glioblastoma" in project_name:
-        image_feature_categories = [
-            "Skeleton",
-            "Median",
-            "ImageQuality",
-            "Count",
-            "TableNumber",
-            "ImageNumber",
-        ]
-        strata_agg = ["Metadata_Plate", "Metadata_Well"]
-    elif "g35" in project_name:
-        image_feature_categories = [
-            "Skeleton",
-            "Median",
-            "ImageQuality",
-            "Count",
-            "TableNumber",
-            "ImageNumber",
-        ]
-        strata_agg = ["Metadata_Plate", "Metadata_Well", "Metadata_Site"]
-    else:
-        image_feature_categories = [
-            "ImageQuality",
-            "Count",
-            "TableNumber",
-            "ImageNumber",
-            "Math",
-        ]
-        strata_agg = ["Metadata_Plate", "Metadata_Well", "Metadata_Site"]
-
-    # add a check for the compartments measured and use those as input to SingleCells
-    possible_compartments = ["cells", "cytoplasm", "nuclei"]
-    plate_path = os.path.join(project_path, "backend", plate)
-    first_folder = next(x for x in Path(plate_path).iterdir() if x.is_dir())
-    txt_files = [
-        f.name.lower()
-        for f in first_folder.iterdir()
-        if f.is_file() and f.suffix == ".txt"
-    ]
-    compartments_found = [
-        comp for comp in possible_compartments if f"{comp}.txt" in txt_files
-    ]
+    image_feature_categories = options.get("image_feature_categories", ["ImageQuality", "Count", "TableNumber", "ImageNumber", "Math"])
+    strata_agg = options.get("strata", ["Metadata_Plate", "Metadata_Well", "Metadata_Site"])
+    tables = set(get_sql_table_names(plate_db_path))
+    compartments_found = [name.lower() for name in ("Cells", "Cytoplasm", "Nuclei") if name in tables]
+    if not compartments_found:
+        raise ValueError(f"No cell compartments in {plate_db_path}")
 
     image_cols = get_image_cols_from_db(
         plate_db_path,
@@ -348,7 +319,7 @@ def join_and_aggregate(
     )
     df = single_cells.merge_single_cells()
 
-    if project_name == "cl2025" or project_name == "a459":
+    if options.get("clean_metadata", False):
         df = clean_metadata_cols(df)
 
     df = merge_innercells_features(df=df, database_path=plate_db_path)
@@ -438,6 +409,7 @@ def join_and_aggregate(
 
 
 def get_features_and_metadata(df, image_features=True):
+    require_profiles()
 
     features = pycytominer.cyto_utils.features.infer_cp_features(
         df, metadata=False, image_features=image_features
@@ -449,6 +421,7 @@ def get_features_and_metadata(df, image_features=True):
 
 
 def annotate(df, platemap, profile_dir):
+    require_profiles()
 
     df_annot = pycytominer.annotate(
         profiles=df,
@@ -463,6 +436,7 @@ def annotate(df, platemap, profile_dir):
 
 
 def normalize(df, features, metadata, profile_dir, normalize_to_negcon=True):
+    require_profiles()
 
     if normalize_to_negcon:
         normalize_to = "Metadata_Control_type == 'negcon'"
@@ -486,6 +460,7 @@ def normalize(df, features, metadata, profile_dir, normalize_to_negcon=True):
 
 
 def feature_selection(df, features, profile_dir, filename, logger):
+    require_profiles()
 
     df_selected = pycytominer.feature_select(
         df,

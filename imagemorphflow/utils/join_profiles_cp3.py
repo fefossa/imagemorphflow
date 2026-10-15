@@ -58,59 +58,27 @@ def check_folders(base_directory):
         return xml_filename, protocol_name
 
 def copy_echo_files():
-    """"
-    generate a json file which has the name of the folder, and then I have to say to which plate belongs to
-    get inside the files and read the protocol name
-    copy them to the output folder
-    """
-    # check_folders to see if protocol exists inside the given path for each of the tested 
-    xml_filename, protocol_name = check_folders("base_directory_to_xml")
-    logger.info("results_from_check_folders")
+    raise NotImplementedError("Legacy Echo-copy integration is not implemented; use convert_echo_files")
 
-    
-    # do this by matching protocol_name last character from plate_new to protocol_name, ignore case 
-    # copy to the output folder using the name of the base_path + profiles/plates inside
-    return
 
-def get_list_features_for_one_plate():
-    df = pd.read_csv("/home/f.garciafossa/projects/cl2025/workspace/profiles/CL2025-01-10.00-20h-250218-A/Results.tsv", sep="\t")
-    feats_list = pycytominer.cyto_utils.infer_cp_features(df)
-    len(feats_list)
-    # Print in the desired format
-    print("Parameters:")
-    for param in feats_list:
-        print(f"    - {param}")
-    return feats_list
+def get_list_features_for_one_plate(profile_path):
+    import pandas as pd
+    import pycytominer
+
+    df = pd.read_csv(profile_path, sep="\t")
+    return pycytominer.cyto_utils.infer_cp_features(df)
+
 
 def change_cp3_config_file():
-    """
-    change the path to the PlatesDir 
-    also fill in Parameters: based on the get_list_features_for_one_plate
-    """
-    PlatesDir
-    DataDir
-    PlateDataDir
-    # open a template config file, save with the project_name to the .config location
-    # do what's in the description
-    return 
+    raise NotImplementedError("Legacy CP3 config generation is not implemented")
+
 
 def profile_plates():
-    """ 
-    run in conda run with analysis_go
-    get Axel's function wrapped here and output df to the profiles/all folder
-    see how to pass the right config file to it
-    """
-    return
+    raise NotImplementedError("Legacy CP3 profiling is not implemented; use join_profiles")
+
 
 def annotate_with_cpp():
-    """
-    run in conda run with analysis_go
-    annotate profiles with cpp
-    see how to pass the right config file to it
-    
-    """
-    return
-
+    raise NotImplementedError("Legacy CP3 annotation is not implemented; use join_profiles")
 
 
 if __name__ == "__main__":

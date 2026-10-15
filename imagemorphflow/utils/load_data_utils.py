@@ -73,52 +73,43 @@ def generate_load_data(
         else:
             images_dir = input_folder
             illum_dir = input_folder + r"/illum"
-        # filesname and channel
-        files = []
-        for dirpath, dirnames, filenames in walk(input_folder):
-            for file in filenames:
-                if "thumb" in file:
-                    continue
-                if re.search(regex_image, file):
-                    files.append(file)
-            files = sorted(files)
-            break
-        # find channels
-        channels = []
-        regex = regex_image
-        for f in files:
-            matches = re.search(regex, f)
-            if matches:
-                channels.append(matches.group("Channel"))
-        # channels = np.array(channels)
-        ch_unique = np.unique(channels)
-        # check number of inputs channels == channels found
-        number_of_channel_input = len(ch_dic)
-        number_of_channel_regex = len(ch_unique)
-        if number_of_channel_input != number_of_channel_regex:
-            logger.warning(
-                f"WARNING: The number of channels you gave ({number_of_channel_input}) are different from the ones we found ({number_of_channel_regex})."
-            )
-        # create columns with files and pathnames
-        temp_list = []
-        illum_list = []
-        for ch in ch_unique:
-            temp_list = []
-            for file in files:
-                if ch in file and ("tif" in file or "TIFF" in file or "tiff" in file):
-                    temp_list.append(file)
-            if " " in ch:
-                ch = ch.replace(" ", "")
-            for key, value in ch_dic.items():
-                if key in ch:
-                    df["FileName_" + value] = temp_list
-                    df["PathName_" + value] = images_dir
-                    file_width = temp_list[0]
-                    path_width = images_dir
-                    if illum_bool:
-                        illum_temp = plate + "_Illum" + value + ".npy"
-                        df["FileName_Illum" + value] = illum_temp
-                        df["PathName_Illum" + value] = illum_dir
+        # Join channels by (well, site), never by independently sorted row positions.
+        records = {}
+        for filename in sorted(os.listdir(input_folder)):
+            if "thumb" in filename.lower() or not filename.lower().endswith((".tif", ".tiff")):
+                continue
+            match = re.search(regex_image, filename)
+            if not match:
+                continue
+            groups = match.groupdict()
+            if not all(groups.get(key) for key in ("Well", "Site", "Channel")):
+                raise ValueError(f"Image regex must capture Well, Site and Channel: {filename}")
+            channel = groups["Channel"]
+            if channel not in ch_dic:
+                continue
+            key = (groups["Well"], groups["Site"])
+            record = records.setdefault(key, {})
+            if channel in record:
+                raise ValueError(f"Duplicate channel {channel} for well/site {key}")
+            record[channel] = filename
+        if not records:
+            raise ValueError(f"No matching images in {input_folder}")
+        rows = []
+        for key, record in sorted(records.items()):
+            missing = set(ch_dic) - set(record)
+            if missing:
+                raise ValueError(f"Missing channels {sorted(missing)} for well/site {key}")
+            row = {}
+            for channel, label in ch_dic.items():
+                row["FileName_" + label] = record[channel]
+                row["PathName_" + label] = images_dir
+                if illum_bool:
+                    row["FileName_Illum" + label] = plate + "_Illum" + label + ".npy"
+                    row["PathName_Illum" + label] = illum_dir
+            rows.append(row)
+        df = pd.DataFrame(rows)
+        file_width = rows[0]["FileName_" + next(iter(ch_dic.values()))]
+        path_width = images_dir
 
         # Process mask columns if required
         if include_masks:
@@ -156,7 +147,7 @@ def generate_load_data(
         wells = []
         sites = []
         for files in df.iloc[:, 0]:
-            matches = re.search(regex, files)
+            matches = re.search(regex_image, files)
             if not matches == None:
                 wells.append(matches.group("Well"))
                 sites.append(matches.group("Site"))
@@ -172,7 +163,7 @@ def generate_load_data(
             path = os.path.join(input_folder, directory)
             os.makedirs(path, exist_ok=True)
         if illum_bool:
-            os.makedirs(cluster_illum_folder, exist_ok=True)
+            os.makedirs(illum_dir, exist_ok=True)
             illum_out = os.path.join(path, "load_data_with_illum.csv")
             df.to_csv(illum_out, index=False)
         else:

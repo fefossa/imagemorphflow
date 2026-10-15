@@ -1,116 +1,68 @@
 # imagemorphflow
 
-[<a href="https://doi.org/10.5281/zenodo.23361703"><img src="https://zenodo.org/badge/1418538349.svg" alt="DOI"></a>
-](https://zenodo.org/badge/1418538349.svg)
+[![CI](https://github.com/cmpela/imagemorphflow/actions/workflows/ci.yml/badge.svg)](https://github.com/cmpela/imagemorphflow/actions/workflows/ci.yml)
 
-Python package for automating high-content screening image analysis workflows, from project setup and image organization to morphological profile processing.
+Python workflows for high-content microscopy and Cell Painting, from image organization to morphological profiles. **CellProfiler 4.2.8** performs image analysis; **micro-sam** optionally generates segmentation masks; **pycytominer** supports aggregation, annotation, normalization and feature selection. Cellpose integration runs through CellProfiler plugins.
 
-`imagemorphflow` uses **CellProfiler 4.2.8** as its core image processing engine, with optional deep learning segmentation through **Cellpose** (via CellProfiler-plugins) or **micro-sam** (based on the Segment Anything Model). Package-specific code handles data ingestion, while **pycytominer** supports downstream annotation, normalization, and feature selection.
-
-**Stable tested environment:** Ubuntu 22.04/24.04 (Linux). Windows users should use WSL2 for best compatibility.
-
-## Workflow overview
-
-The workflow begins by creating a named project, setting up its folder structure, and generating configuration files. Images can optionally be copied to local storage and are linked to the project using symbolic links.
-
-Analysis follows a **plate-based approach**, where each plate corresponds to an acquisition folder in the microscope’s image storage.
-
-## Configuration presets
-
-The package supports the folder structures and image naming conventions of **ImageXpress** and **Endeavor** microscopes. Three configuration presets are available:
-
-- **Cell Painting — ImageXpress:** channel configuration for the classical Cell Painting assay acquired on ImageXpress.
-- **Cell Painting — Endeavor:** the corresponding configuration using Endeavor channel names.
-- **Brightfield — Endeavor:** a brightfield configuration using channel `w5`.
-
-For other assays, override the preset channel configuration by supplying the channels required for your analysis. For example, a nuclei-counting workflow can use only the nuclear channel.
-
-## Features
-
-- **CellProfiler integration:** Full pipeline automation for illumination correction, analysis, and profile generation
-- **Cellpose support:** Integrated via [CellProfiler-plugins](https://github.com/CellProfiler/CellProfiler-plugins) - recommended for best results
-- **micro-sam support:** For custom segmentation models - requires [fefossa/micro-sam](https://github.com/fefossa/micro-sam) with `loaddata_updated` branch
-- **Project structure:** Standardized folder layout for organizing images, masks, and outputs
-- **Plate management:** Automated symlink mapping and plate naming conventions
-- **Echo file handling:** Convert and process liquid handler transfer files
+This fork adds installation checks, explicit configuration, failure propagation, execution records, tests and CI to [Fernanda Garcia Fossa's original project](https://github.com/fefossa/imagemorphflow). Original release DOI: [10.5281/zenodo.23361703](https://doi.org/10.5281/zenodo.23361703). The original BSD 3-Clause license and authorship are preserved.
 
 ## Installation
 
-### Prerequisites
-
-- **Operating System:** Ubuntu 22.04/24.04 (Linux) - **recommended**. For Windows, install [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) with Ubuntu.
-- **CellProfiler 4.2.8** - See installation below
-- **Python 3.9+**
-
-### Step 1: Install CellProfiler
-
-It's recommended to use conda to create a `cellprofiler4` environment, to allow better integration with this package. 
-
-**For Cellpose integration (recommended):**
-
-Follow the CellProfiler-plugins instructions:
-```bash
-git clone https://github.com/CellProfiler/CellProfiler-plugins.git
-cd CellProfiler-plugins
-# Follow their installation guide for CellPose support
-```
-
-**Basic CellProfiler installation:**
-Follow the official instructions for your OS: https://github.com/CellProfiler/CellProfiler/wiki
-
-### Step 2: Install imagemorphflow
+Python **3.9+**. The core package supports **macOS, Windows and Linux**, with native CI jobs on all three systems (including Apple Silicon and Intel macOS). CellProfiler, plugins and GPU models are separate scientific dependencies; see the [platform guide](docs/platforms.md) for installation instructions and validation limits.
 
 ```bash
-# Clone this repository
-git clone https://github.com/fefossa/imagemorphflow.git
+git clone https://github.com/cmpela/imagemorphflow.git
 cd imagemorphflow
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+imf --help
+imf --version
+```
 
-# Create an environment using the yml file
-conda env create -f environment.yml -n imagemorphflow
+Alternatively, from the repository directory:
 
-# Activate the env
+```bash
+conda env create -f environment.yml
 conda activate imagemorphflow
-
-# Install the imagemorphflow package
-pip install -e .
 ```
 
-### Optional: Install micro-sam (for custom segmentation)
-
-To allow better integration with CellProfiler, we modified the code to generate masks that can be imported directly as objects.
+Dependencies for the CLI, YAML/JSON validation, image organization and SQLite ingestion are installed by default. Extras:
 
 ```bash
-# Clone my fork with loaddata_updated branch
-git clone https://github.com/fefossa/micro-sam.git
-cd micro-sam
-git checkout loaddata_updated
-pip install -e .
+python -m pip install -e '.[profiles]'  # pycytominer and Parquet support
+python -m pip install -e '.[reports]'   # commonly used report dependencies
 ```
 
-For Pycytominer:
+The report and legacy utility scripts are not all covered by the stable pipeline API. See [migration notes](docs/migration.md).
+
+### External scientific tools
+
+Install **CellProfiler 4.2.8** separately in a Conda environment called `cellprofiler4`, following the [official installation instructions](https://github.com/CellProfiler/CellProfiler/wiki). Install [CellProfiler-plugins](https://github.com/CellProfiler/CellProfiler-plugins) for Cellpose and set `plugins_dir` in your manifest.
+
+For the modified micro-sam / pycytominer integrations used by the original project, immutable revisions are recorded in [requirements](requirements/README.md). micro-sam normally uses a separate `sam` environment. Set `cellprofiler_env` and `sam_env` to change environment names. These tools and models are not silently downloaded by this package.
+
+The human-maintained `environment.yml` describes direct requirements, rather than exporting platform-specific Conda builds. To archive a particular experiment, export a platform-specific lock from its verified environment and retain it with the results. The pinned fork requirements are not a lock of every transitive dependency.
+
+## Reproducible CPU example
+
+After installing the package:
 
 ```bash
-git clone https://github.com/fefossa/pycytominer.git
-cd pycytominer
-git checkout issues/440
-pip install -e .
+python examples/synthetic/run_demo.py --output demo-output
 ```
 
-## Usage
+The example generates tiny TIFF images and synthetic CellProfiler-style output, builds load-data CSVs, ingests SQLite tables and verifies that extra-channel joins preserve cell identity. Expected `demo-output/summary.json`:
 
-### Configuration
-
-```bash
-tmux new -s run
-conda activate imagemorphflow
-
-PROJECT_NAME=my_project
-mkdir -p /home/$USER/projects/$PROJECT_NAME
+```json
+{"image_rows": 2, "cell_rows": 4, "area_sum": 100, "dna_sum": 1.0}
 ```
 
-#### Create manifest file
+This validates data handling, not segmentation accuracy or biological validity. The example does not execute CellProfiler, pycytominer aggregation or GPU models. It refuses to overwrite an existing output directory; choose a new path to repeat it.
 
-Create a manifest file (e.g., `my_project_manifest.json`):
+## Configuration
+
+Presets support Cell Painting on **ImageXpress** and **Endeavor**, and brightfield on **Endeavor**. Channel mappings can be overridden. Start with `example_manifest.json`:
 
 ```json
 {
@@ -121,107 +73,111 @@ Create a manifest file (e.g., `my_project_manifest.json`):
   "join_profile": "basic",
   "overrides": {
     "project_name": "my_project",
+    "project_root": "~/projects/my_project",
     "image_path": "/path/to/image/folder",
-    "symlinks_file": "my_project.json"
+    "symlinks_file": "my_project.json",
+    "max_workers": 4
   }
 }
 ```
 
-**Microscope options:** `imagexpress`, `endeavor`
+The bundled [JSON Schema](imagemorphflow/schemas/manifest.json) validates manifests. Unknown top-level fields, unsupported steps, invalid resource limits and incompatible switches produce errors. `overrides` remains extensible for specialized scripts; review its keys against the presets.
 
-**Steps:** `illum`, `analysis`, `ingest`, `join`, `copy_to_scratch`, `predict_masks`
+Use `imf doctor` (or `imf doctor --json`) to inspect your OS, Python, Conda and resolved project settings.
 
-### Build configuration
-
-```bash
-imf build --manifest /home/$USER/projects/$PROJECT_NAME/my_project_manifest.json
-```
-
-### Run the pipeline
+Paths share a single resolver. `project_root` defaults to `~/projects/{project_name}`, `base_path` to `{project_root}/workspace`, and image/mask paths derive from that root. `~`, environment variables and `{username}` / `{project_name}` are expanded; `{plate_new}` is retained until each plate is processed. Relative paths are resolved from the working directory, so use absolute paths for repeatable runs.
 
 ```bash
-# Initialize project structure
-imf run --script initialize_project_structure --config /home/$USER/projects/$PROJECT_NAME/workspace/configs/effective/latest_analysis.yaml
-
-# Load data (creates symlinks)
-imf run --script load_data --config /home/$USER/projects/$PROJECT_NAME/workspace/configs/effective/latest_analysis.yaml
-
-# Predict masks (optional - if using micro-sam)
-imf run --script predict_masks --config /path/to/config.yaml
-
-# Run illumination pipeline
-imf run --script run_cellprofiler --config /home/$USER/projects/$PROJECT_NAME/workspace/configs/effective/latest_illum.yaml
-
-# Run analysis pipeline (after illumination completes)
-imf run --script run_cellprofiler --config /home/$USER/projects/$PROJECT_NAME/workspace/configs/effective/latest_analysis.yaml
-
-# Ingest profiles
-imf run --script ingest_profiles --config /home/$USER/projects/$PROJECT_NAME/workspace/configs/effective/latest_ingest.yaml
-
-# Join profiles
-imf run --script join_profiles --config /home/$USER/projects/$PROJECT_NAME/workspace/configs/effective/latest_join.yaml
+imf build --manifest example_manifest.json
+imf build --manifest example_manifest.json --step analysis \
+  -O max_workers=2 -O feature_selection.perform=false
 ```
 
-### Example Manifest Files
+Use top-level `step_overrides` for stage-specific settings, for example `"step_overrides": {"illum": {"pipeline_file": "illum.cppipe"}, "analysis": {"pipeline_file": "analysis.cppipe"}}`. Stage overrides take precedence over shared overrides; CLI `-O` settings take precedence over both.
 
-| File | Description |
-|------|-------------|
-| `example_manifest_full.json` | All options available for override |
-| `example_manifest.json` | CellPainting/ImageXpress setup |
+Effective configs and manifest snapshots are saved under `workspace/configs/effective/`, using unique UTC timestamps. Relative `latest_<step>.yaml` symlinks point to the newest configs. Where symlinks are unavailable, these small YAML files are copied atomically instead.
 
-## Project Folder Structure
+## Run your own analysis
 
-```
-images/
-├── images/     # Raw input images from microscope
-├── illum/      # Illumination correction images
-└── masks/      # Segmentation masks (CellPose or micro-sam output)
+First inspect the plan without creating files or running commands:
 
-workspace/
-├── analysis/       # Analysis pipeline outputs (parquet files)
-├── backend/        # CellProfiler per-image outputs (txt files)
-├── profiles/       # Joined population profiles (Results.tsv)
-├── loaddata/       # Symlinks and metadata
-├── logs/           # Pipeline execution logs
-├── pipelines/      # CellProfiler .cppipe files
-├── scripts/        # Custom scripts
-├── symlinks/       # Symlink mapping JSON files
-├── temp/           # Temporary files
-└── tests/          # Test scripts
+```bash
+imf run --manifest example_manifest.json --dry-run
 ```
 
-### Deep Learning Outputs
+Initialize the project explicitly:
 
-When using segmentation models:
-
-```
-workspace/deeplearning/
-├── cellpose/   # CellPose model outputs and models
-└── sam/        # micro-sam outputs and models
+```bash
+imf build --manifest example_manifest.json --step init
+imf run --script initialize_project_structure \
+  --config ~/projects/my_project/workspace/configs/effective/latest_init.yaml
 ```
 
-## Available Scripts
+**Before continuing:**
 
-These are the stable scripts so far:
+1. Edit `workspace/symlinks/my_project.json`, assigning a non-empty, unique output name to each acquired plate. Initialization preserves existing assignments.
+2. Supply your assay's validated `.cppipe` files in `workspace/pipelines/`, matching `pipeline_file` in each effective config (for example, `analysis_imagexpress.cppipe`). The repository does not include a scientifically validated universal CellProfiler pipeline.
+3. Check microscope naming conventions, channels, plugins, model environments and annotation inputs for your experiment.
 
-| Script | Description |
-|--------|-------------|
-| `initialize_project_structure` | Creates project folder structure and config |
-| `load_data` | Creates image symlinks and plate mappings |
-| `predict_masks` | Runs micro-sam or CellPose segmentation |
-| `run_cellprofiler` | Runs illumination or analysis pipeline |
-| `ingest_profiles` | Joins per-image data into database format |
-| `join_profiles` | Combines all plates into final profiles |
-| `copy_to_scratch` | Copies images to scratch space (if configured) |
-| `plate_overview` | Generates plate overview images |
+Then run the selected stages:
 
-## Notes
+```bash
+imf run --manifest example_manifest.json
+```
 
-- Use `tmux` to keep long-running jobs alive after disconnecting
-- Check logs in `workspace/logs/` for debugging
-- Mask prediction requires GPU for micro-sam
-- Echo file conversion available via `convert_echo_files.py` utility
+`image_link_mode: "auto"` uses directory symlinks when permitted and otherwise reads the original image directory directly. Use `"reference"` to avoid links on every platform or `"symlink"` to require them. Microscopy datasets are never automatically copied by this fallback.
 
-## Authors
+The runner orders initialization, optional scratch copy, load-data creation, optional micro-sam prediction, illumination, analysis, ingestion and joining. Image stages add setup prerequisites; requesting both analysis and join also adds ingestion. `mask_predict=false` skips prediction. Joining existing results can use `steps: ["join"]` without reprocessing images.
 
-Fernanda Garcia Fossa
+For a single stage, the original explicit command remains available:
+
+```bash
+imf run --script ingest_profiles --config /absolute/path/latest_ingest.yaml
+imf run --script join_profiles --config /absolute/path/latest_join.yaml
+```
+
+Running `imf run --config ...` without an explicit script is now rejected: use a manifest to select the full workflow. Commands stream their output. CellProfiler additionally writes its own run log. A failed stage stops subsequent stages and returns a nonzero exit status; persistent batch/segmentation failures are errors even after retrying.
+
+## Analysis options
+
+- `join_profile: "full"` requires your own `overrides.annotate.platemap`; no personal path is bundled.
+- Normalization requires annotation. Feature selection can use raw, annotated or normalized profiles, according to the enabled stages.
+- `join.count_object_column`, `join.image_feature_categories`, `join.strata`, `join.rename_metadata` and `join.clean_metadata` replace implicit rules based on project names.
+- `ingest_image_columns` explicitly selects image-table columns; an empty list preserves them. `ingest_filenames` can replace the default Image/Cells/Cytoplasm/Nuclei file mapping, for example for a nuclei-only assay.
+- Missing required batch files fail ingestion. A complete replacement database is built before replacing a previous result.
+- `max_workers` controls CellProfiler batches, `max_parallel_plates` controls illumination across plates, and `mask_workers` defaults to **1** for GPU memory safety.
+- For external masks, set `masks.include_masks`, `mask_channels`, `mask_output_dir` and `segmentation_method`. For standalone micro-sam prediction also set `mask_predict=true`, `model` and `pattern_images` to match your channel. The brightfield mask defaults are not suitable for every Cell Painting assay. `example_manifest_full.json` demonstrates a nuclear channel override.
+
+## Outputs and provenance
+
+```text
+project_root/
+├── images/{images,illum,masks}/
+└── workspace/
+    ├── configs/effective/
+    ├── symlinks/               # acquisition → plate-name mappings
+    ├── loaddata/               # image metadata CSVs
+    ├── pipelines/              # supplied CellProfiler .cppipe files
+    ├── backend/               # per-plate batches and SQLite databases
+    ├── profiles/              # plate and combined profiles
+    └── logs/runs/             # machine-readable execution records
+```
+
+Every CLI processing stage records timestamps, success/failure, command, config SHA-256, effective settings, package versions and available source commit. Pipeline and explicit model checkpoint files are hashed when configured. CellProfiler / micro-sam environment versions are probed through Conda when possible; unavailable observations are marked as unavailable. Built-in model names do not identify immutable checkpoint contents: archive and configure a model file when exact weights matter.
+
+Environment variables and credential files are not dumped into records. Configurations themselves are retained: do not place secrets in manifests. Keep raw inputs, plate mappings, pipelines, model weights and verified environment locks with the experiment.
+
+## Development and citation
+
+```bash
+python -m unittest discover -s tests -v
+ruff check .
+python -m build
+python tests/smoke_wheel.py dist/*.whl
+```
+
+CI executes these checks and the synthetic example. On Windows, run the PowerShell installation commands in the [platform guide](docs/platforms.md); Unix activation commands above apply to macOS/Linux.
+
+The wheel smoke test installs the built artifact in a temporary environment outside the source tree, checking CLI entry points, subpackages, schemas and YAML presets.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), [migration notes](docs/migration.md), and [CITATION.cff](CITATION.cff).

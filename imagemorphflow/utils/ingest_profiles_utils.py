@@ -1,7 +1,9 @@
+from contextlib import closing
 import os
 import pandas as pd
 import zlib
 import sqlite3
+import tempfile
 
 from pathlib import Path
 
@@ -103,6 +105,7 @@ def ingest_to_db(source, config, output_db_path, skip_image_prefix=True):
         print("Splitting extra channels into auxiliary tables:", extra_channels)
 
     tables_data = {}
+    identifiers = set()
     for directory in directories:
         try:
             image_csv = os.path.join(directory, config["filenames"]["image"])
@@ -111,46 +114,32 @@ def ingest_to_db(source, config, output_db_path, skip_image_prefix=True):
             for filename in config["filenames"].values():
                 if filename != config["filenames"]["image"]:
                     file_path = os.path.join(directory, filename)
-                    if os.path.exists(file_path):
-                        compartment_files.append(file_path)
+                    compartment_files.append(file_path)
 
             for file_path in [image_csv] + compartment_files:
                 if not os.path.isfile(file_path) or os.stat(file_path).st_size == 0:
                     raise IOError(f"File missing or empty: {file_path}")
         except Exception as error:
-            print(f"Skipping {directory}: {error}")
-            continue
+            raise ValueError(f"Invalid CellProfiler output in {directory}: {error}") from error
 
         identifier = checksum(image_csv)
+        if identifier in identifiers:
+            raise ValueError(f"Duplicate image-table checksum in {image_csv}; check duplicated inputs")
+        identifiers.add(identifier)
 
         name, _ = os.path.splitext(config["filenames"]["image"])
         df_img = pd.read_csv(image_csv, sep=None, engine="python")
 
         project_name = config.get("project_name", "")
 
-        essential_image_cols = [
-            "ImageNumber",
-            "ObjectNumber",
-            "Metadata_Plate",
-            "Metadata_Well",
-            "Metadata_Site",
-            "Count_Cells",
-            "Count_Nuclei",
-            "Count_Cytoplasm",
-            "Count_Binuclei",
-            "Math_Measurement",
-        ]
-
-        if project_name == "20260429_CL2025" or project_name == "rpe1":
-            keep_cols = [
-                col for col in df_img.columns
-                if (
-                    col.startswith("ImageQuality_")
-                    or col in essential_image_cols
-                )
-            ]
-
-            df_img = df_img[keep_cols]
+        keep_columns = config.get("image_columns", [])
+        if keep_columns:
+            required = ["ImageNumber", "Metadata_Plate", "Metadata_Well", "Metadata_Site"]
+            selected = list(dict.fromkeys(required + keep_columns))
+            missing = set(selected) - set(df_img.columns)
+            if missing:
+                raise ValueError(f"Missing configured image columns: {sorted(missing)}")
+            df_img = df_img[selected]
 
         if not skip_image_prefix:
             no_prefix = ["ImageNumber", "ObjectNumber"]
@@ -205,17 +194,21 @@ def ingest_to_db(source, config, output_db_path, skip_image_prefix=True):
             else:
                 tables_data.setdefault(table_name, []).append(df)
 
-    if tables_data:
-        os.makedirs(os.path.dirname(output_db_path), exist_ok=True)
-        conn = sqlite3.connect(output_db_path)
-        for table_name, dfs in tables_data.items():
-            merged_df = pd.concat(dfs, ignore_index=True)
-            merged_df.to_sql(table_name, conn, if_exists="replace", index=False)
-            print(
-                f"Wrote table '{table_name}' with "
-                f"{len(merged_df)} rows and {len(merged_df.columns)} columns"
-            )
-        conn.close()
-        print(f"Database written to {output_db_path}")
-    else:
-        print("No data found to write.")
+    if not tables_data:
+        raise ValueError(f"No data found to ingest in {source}")
+    output = Path(output_db_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # Build a complete replacement DB before touching a previous successful result.
+    descriptor, temporary = tempfile.mkstemp(prefix=output.stem + "_", suffix=".db", dir=output.parent)
+    os.close(descriptor)
+    try:
+        with closing(sqlite3.connect(temporary)) as conn:
+            for table_name, dfs in tables_data.items():
+                merged_df = pd.concat(dfs, ignore_index=True)
+                merged_df.to_sql(table_name, conn, if_exists="replace", index=False)
+                print(f"Wrote table '{table_name}' with {len(merged_df)} rows")
+        os.replace(temporary, output)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    print(f"Database written to {output}")

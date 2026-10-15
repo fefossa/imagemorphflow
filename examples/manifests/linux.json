@@ -1,0 +1,20 @@
+{
+  "microscope": "imagexpress",
+  "modality": "cellpainting",
+  "mask_predict": false,
+  "steps": [
+    "analysis",
+    "ingest",
+    "join"
+  ],
+  "join_profile": "basic",
+  "overrides": {
+    "project_name": "demo",
+    "project_root": "~/projects/demo",
+    "image_path": "/data/microscopy/acquisitions",
+    "symlinks_file": "demo.json",
+    "image_link_mode": "reference",
+    "max_workers": 4,
+    "segmentation_device": "cpu"
+  }
+}

@@ -1,7 +1,7 @@
+from imagemorphflow.config import load_config, load_mappings as load_symlink_mappings
 import os
 import re
 import sys
-import yaml
 import json
 import shutil
 import numpy as np
@@ -9,18 +9,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-
-
-def load_config(config_path):
-    """Load configuration from YAML file."""
-    with open(config_path, "r") as file:
-        return yaml.safe_load(file)
-
-
-def load_symlink_mappings(json_path):
-    """Load the symlink mappings from a JSON file."""
-    with open(json_path, "r") as f:
-        return json.load(f)
 
 
 def get_folders_in_path(path):
@@ -147,6 +135,7 @@ def setup_logging(config, base_path, pipeline="no_name"):
 
     logging.basicConfig(
         filename=error_log_path,
+        encoding="utf-8",
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
@@ -206,10 +195,8 @@ def create_symlinks(image_dir, json_file, images_folder_symlink):
         try:
             os.symlink(src_path, dest_path)
             print(f"Created symlink: {dest_path} → {src_path}")
-        except OSError:
-            if os.name == "nt":
-                print("If you're on Windows, run this script as Administrator.")
-                return
+        except OSError as error:
+            raise OSError(f"Could not create symlink {dest_path} -> {src_path}") from error
 
 
 def get_project_base_dir(project_name):

@@ -2,7 +2,11 @@
   "microscope": "imagexpress",
   "modality": "cellpainting",
   "mask_predict": true,
-  "steps": ["analysis", "ingest", "join"],
+  "steps": [
+    "analysis",
+    "ingest",
+    "join"
+  ],
   "join_profile": "basic",
   "overrides": {
     "project_name": "my_project",
@@ -16,16 +20,32 @@
     "correct_illumination": false,
     "max_parallel_plates": 12,
     "images_per_process": 7,
-    "annotate": {"perform": true, "platemap": "/path/to/platemap.csv"},
-    "normalize": {"perform": true, "to_negcons": true},
-    "feature_selection": {"perform": true},
-    "overview_types": ["overlays"],
+    "annotate": {
+      "perform": true,
+      "platemap": "/path/to/platemap.csv"
+    },
+    "normalize": {
+      "perform": true,
+      "to_negcons": true
+    },
+    "feature_selection": {
+      "perform": true
+    },
+    "overview_types": [
+      "overlays"
+    ],
     "font_path": "/path/to/font.ttf",
     "masks": {
       "include_masks": true,
       "segmentation_method": "microsam",
-      "mask_channels": {"MaskCells": "OrigHoechst"},
-      "mask_output_dir": "/home/$USER/projects/my_project/images/masks/{plate_new}"
-    }
+      "mask_channels": {
+        "MaskCells": "OrigHoechst"
+      },
+      "mask_output_dir": "{project_root}/images/masks/{plate_new}"
+    },
+    "project_root": "~/projects/my_project",
+    "pattern_images": "*_w1_*.tif*",
+    "max_workers": 4,
+    "mask_workers": 1
   }
 }

@@ -1,27 +1,45 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "imagemorphflow"
-version = "1.0.0"
-requires-python = ">= 3.8"
-description = "Run Cell Painting analysis with CellProfiler 4.2.8"
-authors = [
-  {name = "Fernanda Garcia Fossa"}
-]
-maintainers = [
-  {name = "Fernanda Garcia Fossa"}
-]
-
+dynamic = ["version"]
+requires-python = ">=3.9"
+description = "Run image-based profiling workflows with CellProfiler"
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+authors = [{name = "Fernanda Garcia Fossa"}]
 dependencies = [
-  "numpy",
-  "pandas",
-  "scipy"
+  "click>=8.1,<9", "PyYAML>=6,<7", "jsonschema>=4.18,<5",
+  "numpy>=1.23,<3", "pandas>=1.5,<3", "scipy>=1.9,<2", "Pillow>=9,<13",
 ]
 
-[tool.setuptools]
-packages = ["imagemorphflow"]
+[project.optional-dependencies]
+profiles = ["pycytominer>=1,<2", "pyarrow>=12"]
+reports = ["matplotlib>=3.6", "seaborn>=0.12", "scikit-learn>=1.2", "openpyxl>=3.1"]
+dev = ["build>=1.2", "ruff>=0.9,<1"]
+
+[project.urls]
+Repository = "https://github.com/cmpela/imagemorphflow"
+Upstream = "https://github.com/fefossa/imagemorphflow"
+Issues = "https://github.com/cmpela/imagemorphflow/issues"
 
 [project.scripts]
 imf = "imagemorphflow.cli.cli:cli"
+
+[tool.setuptools.dynamic]
+version = {attr = "imagemorphflow.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["imagemorphflow*"]
+
+[tool.setuptools.package-data]
+imagemorphflow = ["schemas/*.json", "processing/configs/*.yaml", "processing/configs/*/*.yaml", "utils/*.sh"]
+
+[tool.ruff]
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E9", "F63", "F7", "F82"]

@@ -18,18 +18,16 @@ def generate_symlink_json(config_path):
         output_dir_template.format(username=username, project_name=project_name)
     )
 
-    project_base_dir = file_utils.get_project_base_dir(project_name)
+    project_base_dir = Path(config["project_root"])
     # if not os.path.isdir(project_base_dir):
     create_project_structure.create_project_structure(project_base_dir)
 
     output_dir = output_dir / "symlinks"
+    output_dir.mkdir(parents=True, exist_ok=True)
     json_file = output_dir / config["symlinks_file"]
 
     if not image_dir or not os.path.exists(image_dir):
-        print(
-            f"Error: image_path '{image_dir}' does not exist! Check your config.yaml."
-        )
-        return
+        raise FileNotFoundError(f"image_path does not exist: {image_dir}")
 
     print(f"Scanning folders in: {image_dir}")
 

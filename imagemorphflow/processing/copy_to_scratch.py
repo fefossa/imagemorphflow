@@ -31,12 +31,10 @@ def copy_image_folders_to_scratch(config_path):
     json_file = output_dir / "symlinks" / config["symlinks_file"]
 
     if not json_file.exists():
-        logger.info(f"Symlink mapping file not found: {json_file}")
-        return
+        raise FileNotFoundError(f"Symlink mapping file not found: {json_file}")
 
     # Load mapping
-    with open(json_file, "r") as f:
-        mappings = json.load(f)
+    mappings = file_utils.load_symlink_mappings(json_file)
 
     # image_dir_scratch = scratch_base_path / "images" / "images"
     for plate_old, plate_new in mappings.items():
@@ -47,8 +45,7 @@ def copy_image_folders_to_scratch(config_path):
         temp_target_folder = scratch_path / (str(relative_path) + ".tmp")
 
         if not source_folder.exists():
-            logger.info(f"Source folder not found: {source_folder}")
-            continue
+            raise FileNotFoundError(f"Source folder not found: {source_folder}")
 
         if target_folder.exists():
             logger.info(f"Already copied: {target_folder}")
@@ -69,6 +66,7 @@ def copy_image_folders_to_scratch(config_path):
             if temp_target_folder.exists():
                 logger.info(f"Cleaning up temp folder due to failure: {temp_target_folder}")
                 shutil.rmtree(temp_target_folder)
+            raise RuntimeError(f"Failed to copy {source_folder}") from e
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ def process_segmentations(config_path):
     username = os.environ.get("USER") or os.environ.get("USERNAME") or "default_user"
     output_dir_template = config["base_path"]
 
-    num_cores = file_utils.get_num_cores(0.95)
+    num_cores = int(config.get("mask_workers", 1))
 
     masks_config = config.get("masks", {})
     mask_output_dir_template = masks_config.get("mask_output_dir", None)
@@ -50,7 +50,8 @@ def process_segmentations(config_path):
             commands = predict_masks_utils.generate_segmentation_command(
                 image_path, mask_output_dir, plate_new, config
             )
-            # commands = predict_masks_utils.dry_run()
+            if not commands:
+                raise ValueError(f"No images found for segmentation in {image_path}")
             for cmd in commands:
                 futures[executor.submit(predict_masks_utils.run_segmentation, cmd)] = (
                     cmd
@@ -62,9 +63,13 @@ def process_segmentations(config_path):
                 logger.error(f"Failed: {' '.join(futures[future])}")
 
     # Retry failed commands
+    persistent_failures = []
     for cmd in failed:
         logger.info(f"Retrying failed command: {' '.join(cmd)}")
-        predict_masks_utils.run_segmentation(cmd)
+        if not predict_masks_utils.run_segmentation(cmd):
+            persistent_failures.append(cmd)
+    if persistent_failures:
+        raise RuntimeError(f"{len(persistent_failures)} segmentation commands failed")
 
 
 if __name__ == "__main__":

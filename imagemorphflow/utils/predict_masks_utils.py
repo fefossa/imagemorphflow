@@ -3,6 +3,10 @@ import subprocess
 import logging
 import yaml
 import glob
+import csv
+import fnmatch
+from pathlib import Path
+from imagemorphflow.portable import conda_command
 from datetime import datetime
 
 
@@ -14,6 +18,7 @@ def setup_logging(project_name, base_path):
 
     logging.basicConfig(
         filename=error_log_path,
+        encoding="utf-8",
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )
@@ -22,7 +27,7 @@ def setup_logging(project_name, base_path):
 
 def run_segmentation(cmd):
     """Run the micro_sam automatic segmentation command."""
-    full_cmd = ["conda", "run", "-n", "sam"] + cmd
+    full_cmd = cmd
     logging.info(f"STARTING: {' '.join(full_cmd)}")
     try:
         result = subprocess.run(
@@ -42,9 +47,19 @@ def run_segmentation(cmd):
         return False
 
 
-def get_images(image_path, pattern):
+def get_images(image_path, pattern, data_file=None):
     # Use glob to match files with the given pattern
-    image_files = glob.glob(os.path.join(image_path, pattern))
+    if data_file and Path(data_file).is_file():
+        image_files = []
+        with open(data_file, newline="", encoding="utf-8") as stream:
+            for row in csv.DictReader(stream):
+                for key, name in row.items():
+                    if key.startswith("FileName_") and not key.startswith("FileName_Illum") and fnmatch.fnmatch(name, pattern):
+                        path_key = key.replace("FileName_", "PathName_", 1)
+                        image_files.append(os.path.join(row[path_key], name))
+        image_files = sorted(set(image_files))
+    else:
+        image_files = sorted(glob.glob(os.path.join(image_path, pattern)))
 
     # Get the file names (i.e., just the base names without directories)
     file_names = [os.path.basename(file) for file in image_files]
@@ -61,7 +76,8 @@ def generate_segmentation_command(image_path, output_dir, plate, config):
     model = config["model"]
     pattern_images = config["pattern_images"]
     os.makedirs(output_dir, exist_ok=True)
-    image_files, file_names = get_images(image_path, pattern_images)
+    data_file = Path(config["base_path"]) / "loaddata" / plate / "load_data.csv"
+    image_files, file_names = get_images(image_path, pattern_images, data_file)
     output_files = [os.path.join(output_dir, file_name) for file_name in file_names]
 
     commands = []
@@ -79,16 +95,19 @@ def generate_segmentation_command(image_path, output_dir, plate, config):
             "--model_type",
             model,
             "--tile_shape",
-            "512", "512",
+            *[str(value) for value in config.get("tile_shape", [512, 512])],
             "--halo",
-            "128", "128",
+            *[str(value) for value in config.get("halo", [128, 128])],
             "--batch_size",
             "4",
             "--verbose",
             # "--device",
             # "cpu",
         ]
-        commands.append(cmd)
+        device = config.get("segmentation_device", "auto")
+        if device != "auto":
+            cmd.extend(["--device", device])
+        commands.append(conda_command(config.get("sam_env", "sam"), cmd, config.get("conda_executable")))
 
     return commands
 

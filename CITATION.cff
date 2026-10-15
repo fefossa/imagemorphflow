@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "Please credit the original imagemorphflow project and identify the fork revision used in your analysis."
+type: software
+title: "imagemorphflow (cmpela fork)"
+version: 1.2.0
+license: BSD-3-Clause
+authors:
+  - family-names: "Fossa"
+    given-names: "Fernanda Garcia"
+repository-code: "https://github.com/cmpela/imagemorphflow"
+references:
+  - type: software
+    title: "imagemorphflow (original release)"
+    authors:
+      - family-names: "Fossa"
+        given-names: "Fernanda Garcia"
+    doi: "10.5281/zenodo.23361703"
+    repository-code: "https://github.com/fefossa/imagemorphflow"

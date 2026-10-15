@@ -1,26 +1,9 @@
+from imagemorphflow.config import load_config, load_mappings as load_symlink_mappings
 # Written by Fernanda Garcia Fossa
 # Inspired by cytominer_database.ingest, now deprecated
 import os
 from pathlib import Path
-import yaml
-import json
 from imagemorphflow.utils import ingest_profiles_utils, file_utils
-
-
-def load_config(config_path):
-    with open(config_path, "r") as f:
-        if config_path.endswith(".yaml") or config_path.endswith(".yml"):
-            return yaml.safe_load(f)
-        elif config_path.endswith(".json"):
-            return json.load(f)
-        else:
-            raise ValueError("Config must be YAML or JSON")
-
-
-def load_symlink_mappings(json_path):
-    with open(json_path, "r") as f:
-        return json.load(f)
-
 
 def process_all_plates(config_path):
     config = load_config(config_path)
@@ -50,14 +33,17 @@ def process_all_plates(config_path):
             # "innercells": "InnerCells.txt", # was used for the hek293 project for singlecell information retrieval
         },
         "ingest": config.get("ingest", {}),
+        "image_columns": config.get("ingest_image_columns", []),
     }
+
+    if config.get("ingest_filenames"):
+        ingest_config["filenames"] = config["ingest_filenames"]
 
     for plate_old, plate_new in symlink_mappings.items():
         logger.info(f"🧪 Processing plate {plate_new}")
         plate_dir = os.path.join(backend_path, plate_new)
         if not os.path.isdir(plate_dir):
-            print(f"Plate directory not found: {plate_dir}, skipping.")
-            continue
+            raise FileNotFoundError(f"Plate directory not found: {plate_dir}")
         db_path = os.path.join(plate_dir, f"{plate_new}.db")
         print(f"\nProcessing plate {plate_new} → {db_path}")
         ingest_profiles_utils.ingest_to_db(
@@ -66,7 +52,6 @@ def process_all_plates(config_path):
             output_db_path=db_path,
             skip_image_prefix=True,  # or False, your choice
         )
-
 
 if __name__ == "__main__":
     import argparse

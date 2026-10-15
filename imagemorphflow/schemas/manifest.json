@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ImageMorphFlow manifest",
+  "type": "object",
+  "required": [
+    "microscope",
+    "modality",
+    "steps",
+    "overrides"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "microscope": {
+      "enum": [
+        "imagexpress",
+        "endeavor"
+      ]
+    },
+    "modality": {
+      "enum": [
+        "cellpainting",
+        "brightfield"
+      ]
+    },
+    "mask_predict": {
+      "type": "boolean"
+    },
+    "join_profile": {
+      "enum": [
+        "basic",
+        "full"
+      ]
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "init",
+          "copy_to_scratch",
+          "load_data",
+          "predict_masks",
+          "illum",
+          "analysis",
+          "ingest",
+          "join"
+        ]
+      }
+    },
+    "overrides": {
+      "type": "object",
+      "required": [
+        "project_name",
+        "image_path",
+        "symlinks_file"
+      ],
+      "properties": {
+        "project_name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+        },
+        "image_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "symlinks_file": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*\\.json$"
+        },
+        "max_workers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "mask_workers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "images_per_process": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_parallel_plates": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "annotate": {
+          "$ref": "#/$defs/toggle"
+        },
+        "normalize": {
+          "$ref": "#/$defs/toggle"
+        },
+        "feature_selection": {
+          "$ref": "#/$defs/toggle"
+        },
+        "image_link_mode": {
+          "enum": [
+            "auto",
+            "symlink",
+            "reference"
+          ]
+        },
+        "segmentation_device": {
+          "enum": [
+            "auto",
+            "cpu",
+            "cuda",
+            "mps"
+          ]
+        },
+        "conda_executable": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "step_overrides": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "init",
+          "copy_to_scratch",
+          "load_data",
+          "predict_masks",
+          "illum",
+          "analysis",
+          "ingest",
+          "join"
+        ]
+      },
+      "additionalProperties": {
+        "type": "object"
+      }
+    }
+  },
+  "$defs": {
+    "toggle": {
+      "type": "object",
+      "properties": {
+        "perform": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

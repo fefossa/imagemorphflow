@@ -1,3 +1,5 @@
+from imagemorphflow.portable import plate_image_directory
+from imagemorphflow.config import load_config, load_mappings as load_symlink_mappings
 # Script to run micro-sam for one image after the other for GPU
 # 15 seconds per image
 # To run
@@ -14,21 +16,9 @@ from datetime import datetime
 from pathlib import Path
 
 
-def load_config(config_path):
-    """Load configuration from YAML file."""
-    with open(config_path, "r") as file:
-        return yaml.safe_load(file)
-
-
 def get_num_cores(fraction=0.8):
     total_cores = os.cpu_count() or 1
     return max(1, int(total_cores * fraction))
-
-
-def load_symlink_mappings(json_path):
-    """Load the symlink mappings from a JSON file."""
-    with open(json_path, "r") as f:
-        return json.load(f)
 
 
 def process_segmentations(config_path):
@@ -58,11 +48,7 @@ def process_segmentations(config_path):
     failed = []
     for plate_old, plate_new in symlink_mappings.items():
         # Input path uses plate_new (symlinks)
-        image_path = image_path_template.format(
-            username=username,
-            project_name=config["project_name"],
-            plate_new=plate_new,
-        )
+        image_path = str(plate_image_directory(config, plate_new))
         
         # Output path uses plate_old (real names)
         mask_output_dir = mask_output_dir_template.format(
@@ -90,9 +76,13 @@ def process_segmentations(config_path):
             create_symlinks_for_masks(mask_output_dir, image_path, plate_new, config, logger)
 
     # Retry failed commands
+    persistent_failures = []
     for cmd in failed:
         logger.info(f"Retrying failed command: {' '.join(cmd)}")
-        run_segmentation(cmd)
+        if not run_segmentation(cmd):
+            persistent_failures.append(cmd)
+    if persistent_failures:
+        raise RuntimeError(f"{len(persistent_failures)} segmentation commands failed")
 
 
 def setup_logging(project_name, base_path):
@@ -103,6 +93,7 @@ def setup_logging(project_name, base_path):
 
     logging.basicConfig(
         filename=error_log_path,
+        encoding="utf-8",
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
     )

@@ -2,16 +2,18 @@
 project_name: "c2025"
 microscope: "imagexpress"
 image_path: "/data/images"
+image_link_mode: "auto"
 use_scratch: false
-scratch_image_path: "/mnt/scratch"
+scratch_image_path: "{project_root}/scratch"
 
 cellprofiler_env: "cellprofiler4"
 
-base_path: "/home/{username}/projects/{project_name}/workspace"
-image_local_path: "/home/{username}/projects/{project_name}/images/images/{plate_new}"
-illum_out_path: "/home/{username}/projects/{project_name}/images/illum/{plate_new}"
+project_root: "~/projects/{project_name}"
+base_path: "{project_root}/workspace"
+image_local_path: "{project_root}/images/images/{plate_new}"
+illum_out_path: "{project_root}/images/illum/{plate_new}"
 
-plugins_dir: "/home/{username}/github/CellProfiler-plugins/active_plugins"
+plugins_dir: "~/github/CellProfiler-plugins/active_plugins"
 
 # overview_types: ["plates"] #it can be ["plates", "overlays", "branchpoints"]
 # font_path: "/mnt/c/Windows/Fonts/LiberationMono-Bold.ttf"
@@ -27,14 +29,14 @@ plugins_dir: "/home/{username}/github/CellProfiler-plugins/active_plugins"
 
 microscopes:
   imagexpress:
-    regex_image: "(?P<Well>[A-P][0-9]{1,2})_s(?P<Site>[0-9])_(?P<Channel>w[0-9])(?!.*_thumb)"
+    regex_image: "(?P<Well>[A-P][0-9]{1,2})_s(?P<Site>[0-9]{1,2})_(?P<Channel>w[0-9])(?!.*_thumb)"
     regex_plate: ".*[\\/](?P<Plate>.*)"
     input_folder_pattern: "{image_dir}/{plate_old}/*/*"
     recursive: true
     # num_sites_x: 3
     # num_sites_y: 3
   endeavor:
-    regex_image: "(?P<Well>[A-P][0-9]{1,2})_s(?P<Site>[0-9]{1,2})_(?P<Channel>w[0-9])_z-|z-m_(?!.*_thumbnail)"
+    regex_image: "(?P<Well>[A-P][0-9]{1,2})_s(?P<Site>[0-9]{1,2})_(?P<Channel>w[0-9])_(?:z-|z-m_)(?!.*_thumbnail)"
     regex_plate: ".*[\\/](?P<Plate>.*)"
     input_folder_pattern: "{image_dir}/{plate_old}"
     recursive: false
@@ -43,3 +45,24 @@ microscopes:
 
 ingest:
   split_extra_channels: []
+
+# Resource limits apply within one plate; GPU prediction defaults to one process.
+max_workers: 4
+mask_workers: 1
+annotate: {perform: false}
+normalize: {perform: false, to_negcons: false}
+feature_selection: {perform: false}
+
+# Analysis behavior is explicit and independent of project names.
+ingest_image_columns: []
+join:
+  count_object_column: Count_Cells
+  image_feature_categories: [ImageQuality, Count, TableNumber, ImageNumber, Math]
+  strata: [Metadata_Plate, Metadata_Well, Metadata_Site]
+  rename_metadata: false
+  clean_metadata: false
+
+# Override if Conda is not available on PATH (use conda.exe on Windows).
+conda_executable: null
+sam_env: "sam"
+segmentation_device: "auto"

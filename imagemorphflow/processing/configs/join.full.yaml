@@ -1,3 +1,3 @@
-annotate: { perform: true, platemap: "/home/f.garciafossa/projects/glioblastoma/workspace/platemaps/20250711_plate_layout.csv" }
-normalize: { perform: true, to_negcons: true }
-feature_selection: { perform: true }
+annotate: {perform: true, platemap: null}
+normalize: {perform: true, to_negcons: true}
+feature_selection: {perform: true}

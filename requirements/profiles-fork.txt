@@ -1,0 +1,2 @@
+# Immutable revision of the original project's pycytominer integration.
+pycytominer @ git+https://github.com/fefossa/pycytominer.git@06fd80a98c7273e7f5be5db31bfac707bb40b6bb

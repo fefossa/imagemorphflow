@@ -1,3 +1,4 @@
+from imagemorphflow.portable import plate_image_directory
 import os
 import re
 import argparse
@@ -195,11 +196,7 @@ def main(config_path):
     for plate_old, plate_new in symlink_mappings.items():
         for channel in common_channels:
             for ov in config["overview_types"]:
-                input_images = image_path_template.format(
-                    username=username,
-                    project_name=config["project_name"],
-                    plate_new=plate_new,
-                )
+                input_images = str(plate_image_directory(config, plate_new))
                 if "plates" in ov:
                     plate_overview_output = (
                         output_dir / "plate_overview" / "plates" / plate_new

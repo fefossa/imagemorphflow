@@ -1,0 +1,2 @@
+# Install inside the separately configured sam environment after its prerequisites.
+micro-sam @ git+https://github.com/fefossa/micro-sam.git@d5e1aaeaa57ec70f289e0972301157bac033c1ce

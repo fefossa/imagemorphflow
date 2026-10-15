@@ -3,7 +3,7 @@ masks:
   segmentation_method: "microsam"
   mask_channels:
     MaskCells: OrigTL
-  mask_output_dir: "/home/{username}/projects/{project_name}/images/masks/{plate_new}"
+  mask_output_dir: "{project_root}/images/masks/{plate_new}"
 model: "vit_l_lm"
 pattern_images: "*_*_w5_*.tiff"
 tile_shape: [768, 768]

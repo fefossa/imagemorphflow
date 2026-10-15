@@ -4,3 +4,11 @@
 __pycache__/
 *.pyc
 imagemorphflow/__pycache__/__init__.cpython-39.pyc
+
+build/
+dist/
+.venv/
+.ruff_cache/
+.coverage
+htmlcov/
+demo-output/
